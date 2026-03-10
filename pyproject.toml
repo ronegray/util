@@ -1,0 +1,11 @@
+[project]
+name = "util"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "pyinstaller>=6.19.0",
+    "pyxel>=2.8.0",
+    "ruff>=0.15.5",
+]
