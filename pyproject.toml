@@ -9,3 +9,5 @@ dependencies = [
     "pyxel>=2.8.0",
     "ruff>=0.15.5",
 ]
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401","F811"]
