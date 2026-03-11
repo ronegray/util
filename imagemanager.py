@@ -1,4 +1,10 @@
-import gzip
+"""imagemanager.py
+難読化画像ファイル入出力関連
+
+- bmp画像の難読化
+- 難読化bmpの読み込みとpyxel用イメージデータ化
+"""
+from gzip import compress, decompress
 from pyxel import Image
 from hashlib import sha256
 from struct import pack, unpack
@@ -19,7 +25,7 @@ def convert_bmp(filename: str) -> bool:
     raw_pixel_data = bytes(pixel_data)
     # 3. 展開時に利用する画像サイズ情報を付与してピクセルデータを圧縮する
     sizeheader = pack("!HH", img.width, img.height)
-    compressed = gzip.compress(sizeheader + raw_pixel_data)
+    compressed = compress(sizeheader + raw_pixel_data)
     # 4. ハッシュ計算
     hash_value = sha256(compressed).digest()
     # 5. データファイルの出力
@@ -48,7 +54,7 @@ def load_dat_bmp(filename: str) -> Image | None:
         return None
 
     # 復元処理
-    decompressed = gzip.decompress(compressed)
+    decompressed = decompress(compressed)
     sizeheader = decompressed[:4]
     raw_pixel_data = decompressed[4:]
     img_width, img_height = unpack("!HH", sizeheader)

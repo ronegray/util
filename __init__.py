@@ -1,12 +1,13 @@
 from .filemanager import (
     check_file,
     read_string,
-    read_json,
-    read_bin,
     write_string,
+    read_json,
     write_json,
+    read_bin,
     write_bin,
 )
+from .imagemanager import convert_bmp, load_dat_bmp
 from .inputmanager import (
     init,
     keybind,
@@ -16,5 +17,4 @@ from .inputmanager import (
     save_config,
     load_config,
 )
-from .imagemanager import convert_bmp, load_dat_bmp
-from .soundmanager import init, get_score_name, load_score, build_music
+from .soundmanager import init, load_bgm

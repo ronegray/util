@@ -1,3 +1,12 @@
+"""customtone.py
+標準Toneクラスを内包する拡張クラス
+
+- toneのカスタム化
+-- ビット深度拡張
+-- 三角波、矩形波の拡張
+-- Duty比50％のパルス波、サイン波、ノコギリ派の追加
+- 事前定義jsonファイルから拡張Tone用パラメータのセーブ・ロード
+"""
 from pyxel import Tone, sin
 from .filemanager import check_file, read_json, write_json
 

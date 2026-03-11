@@ -1,3 +1,20 @@
+"""windowmanager.py
+ウインドウ・メニュークラスおよび管理クラス
+
+- ウインドウ機能
+-- 任意サイズのウインドウ表示
+-- 定義したテキストの表示
+-- リストテキストの場合はページ送り
+-- クローズ契機をボタン押下／一定時間後／全ページ送り後に指定可能
+- メニュー機能(abstructとして利用)
+-- 指定項目リストに応じたメニュー表示
+-- メニューウインドウサイズは項目に応じて自動設定
+-- 基本的機能のみ提供。用途に応じて継承する
+- 管理機能
+-- ウインドウとメニューのスタックを管理（追加・削除）
+-- 最終スタックの更新と描画
+-- スタックの全終了を最終スタックから依頼可能
+"""
 from enum import Enum, auto
 from typing import Literal
 from dataclasses import dataclass
@@ -26,7 +43,7 @@ class WindowAction(Enum):
 @dataclass
 class FontData:
     name: FontSizeName  # サイズ名
-    font: px.Font  # フォントオブジェクト
+    font: px.Font | None  # フォントオブジェクト
     height: int = 6  # フォントの高さ
 
 
@@ -349,7 +366,9 @@ class Menu:
         offset_cursor = Window.chip_size + (
             Window.chip_size // 4
         )  # カーソルサイズ、文字との余白
-        offset_sepalete_col = self.font.text_width(" ") // 2  # 項目間余白
+        offset_sepalete_col = (
+            2 if self.font is None else self.font.text_width(" ") // 2
+        )  # 項目間余白
 
         # 文字列／カーソル表示用のpixelアドレスキャッシュ初期化
         self.column_x_pos: list[int] = []
@@ -360,9 +379,13 @@ class Menu:
             # 現在のカラムのX座標を記録
             self.column_x_pos.append(current_x)
 
-            max_column_textlen = self.font.text_width(
-                max(column_text, key=self.font.text_width)
-            )
+            if self.font:
+                max_column_textlen = self.font.text_width(
+                    max(column_text, key=self.font.text_width)
+                )
+            else:
+                # デフォルトフォントの場合の文字長は4ピクセル
+                max_column_textlen = len(column_text) * 4
             menuwidth += offset_cursor + max_column_textlen + offset_sepalete_col
             current_x += menuwidth
 
@@ -439,44 +462,45 @@ class Menu:
 
     def exec_menu(self):
         """メニュー個別の処理実行用"""
-        if self.cursor_position == [0, 0]:
-            window_manager.push_stack(
-                Window,
-                "large",
-                self.windows["main"].x + 16,
-                self.windows["main"].y + 16,
-                px.width // 2,
-                px.height // 8,
-                "once",
-            )
-            window_manager.stacks[-1].text_list = ["menuテスト"]
-        elif self.cursor_position == [0, 1]:
-            window_manager.push_stack(
-                Menu,
-                "small",
-                self.windows["main"].x + 16,
-                self.windows["main"].y + 16,
-                [1, 2],
-                [["縦１"], ["縦２"]],
-            )
-        elif self.cursor_position == [1, 1]:
-            window_manager.push_stack(
-                Menu,
-                "basic",
-                self.windows["main"].x + 16,
-                self.windows["main"].y + 16,
-                [2, 1],
-                [["横１", "横２"]],
-            )
-        elif self.cursor_position == [1, 0]:
-            window_manager.push_stack(
-                Menu,
-                "large",
-                self.windows["main"].x + 16,
-                self.windows["main"].y + 16,
-                [2, 3],
-                [["横１", "横２"], ["横１", "横２"], ["横１", "横２"]],
-            )
+        # if self.cursor_position == [0, 0]:
+        #     window_manager.push_stack(
+        #         Window,
+        #         "large",
+        #         self.windows["main"].x + 16,
+        #         self.windows["main"].y + 16,
+        #         px.width // 2,
+        #         px.height // 8,
+        #         "once",
+        #     )
+        #     window_manager.stacks[-1].text_list = ["menuテスト"]
+        # elif self.cursor_position == [0, 1]:
+        #     window_manager.push_stack(
+        #         Menu,
+        #         "small",
+        #         self.windows["main"].x + 16,
+        #         self.windows["main"].y + 16,
+        #         [1, 2],
+        #         [["縦１"], ["縦２"]],
+        #     )
+        # elif self.cursor_position == [1, 1]:
+        #     window_manager.push_stack(
+        #         Menu,
+        #         "basic",
+        #         self.windows["main"].x + 16,
+        #         self.windows["main"].y + 16,
+        #         [2, 1],
+        #         [["横１", "横２"]],
+        #     )
+        # elif self.cursor_position == [1, 0]:
+        #     window_manager.push_stack(
+        #         Menu,
+        #         "large",
+        #         self.windows["main"].x + 16,
+        #         self.windows["main"].y + 16,
+        #         [2, 3],
+        #         [["横１", "横２"], ["横１", "横２"], ["横１", "横２"]],
+        #     )
+        pass
 
     def draw(self):
         """描画"""

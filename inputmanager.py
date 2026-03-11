@@ -1,4 +1,10 @@
-# input.py
+"""inputmanager.py
+キー操作関連
+
+- キー操作の設定および設定対象キーの判定
+- 判定対象操作に対するキーの入力チェック
+- 設定の保存・呼び出し
+"""
 import pyxel as px
 from typing import Literal, Callable
 from .filemanager import check_file, write_json, read_json
@@ -156,6 +162,117 @@ _key_assign_map_pad: dict[str, dict[str, int]] = {}
 _key_assign_map_kbd: dict[str, dict[str, int]] = {}
 
 
+def init():
+    """初期化時に一括でバインドする"""
+    _bind_all_actions("pad")
+    _bind_all_actions("kbd")
+
+
+def keybind(
+    action_name: str,
+    key_code: int,
+    input_sign: int = 1,
+    bind_target: TargetDevice = "pad",
+) -> bool:
+    """行動名に対してキーコード設定済入力判定クロージャおよびセーブロード用辞書を設定"""
+    match bind_target:
+        case "pad":
+            # rust>pyxel-platform>key.rsより
+            if key_code < px.GAMEPAD1_AXIS_LEFTX:
+                print(f"Warning: {action_name} to {key_code} is not a valid Pad code.")
+                return False
+            target_actmap = _action_keymap_pad
+            target_assign = _key_assign_map_pad
+        case "kbd":
+            if key_code >= px.MOUSE_POS_X:
+                print(
+                    f"Warning: {action_name} to {key_code} is not a valid keyboard code."
+                )
+                return False
+            target_actmap = _action_keymap_kbd
+            target_assign = _key_assign_map_kbd
+        case _:
+            return False
+
+    target_actmap[action_name] = _generate_handler(key_code, input_sign)
+    target_assign[action_name] = {"code": key_code, "input_sign": input_sign}
+
+    return True
+
+
+def listener(listen_target: TargetDevice = "pad") -> tuple[int, int] | None:
+    if listen_target == "pad":
+        # キーパッドの判定(アナログ入力)
+        for keycode in range(px.GAMEPAD1_AXIS_LEFTX, px.GAMEPAD1_AXIS_RIGHTY + 1):
+            input_val = px.btnv(keycode)
+            if (
+                abs(input_val) > ANALOG_THRESHOLD_XY
+            ):  # 1以上、とかだと遊びの範囲で超反応するケースあり
+                input_sign = int(px.sgn(input_val))
+                return keycode, input_sign
+        for keycode in range(px.GAMEPAD1_AXIS_TRIGGERLEFT, px.GAMEPAD1_AXIS_RIGHTY + 1):
+            input_val = px.btnv(keycode)
+            if abs(input_val) > ANALOG_THRESHOLD_TRIGGER:
+                return keycode, 1
+
+        # キーパッドの判定(デジタル入力)
+        for keycode in range(px.GAMEPAD1_BUTTON_A, px.GAMEPAD1_BUTTON_DPAD_RIGHT + 1):
+            if px.btnp(keycode):
+                return keycode, 1
+
+    elif listen_target == "kbd":
+        for keycode in ASSIGNABLE_KEYS:
+            if px.btnp(keycode):
+                return keycode, 1
+
+    return None
+
+
+def is_pressed(action_name: str, mode: InputMode = "once") -> bool:
+    """アクションに該当する入力の有無を判定する"""
+    # パッド
+    func_pad = _action_keymap_pad.get(action_name)
+    is_pad = func_pad(mode) if func_pad else False
+    # キーボード
+    func_kbd = _action_keymap_kbd.get(action_name)
+    is_kbd = func_kbd(mode) if func_kbd else False
+
+    return is_pad or is_kbd
+
+
+def get_keymap(target: TargetDevice):
+    """本モジュール利用側へキーマップ情報を提供"""
+    match target:
+        case "pad":
+            keymap = _key_assign_map_pad
+        case "kbd":
+            keymap = _key_assign_map_kbd
+
+    return keymap
+
+
+def _bind_all_actions(bind_target: TargetDevice, key_assign_map: dict | None = None):
+    """定義済データの一括反映"""
+    if key_assign_map is None:
+        if bind_target == "pad":
+            key_assign_map = DEFAULT_BINDS_PAD.copy()
+        elif bind_target == "kbd":
+            key_assign_map = DEFAULT_BINDS_KBD.copy()
+        else:
+            print(f"Warning: No default bindmap for bind_target:{bind_target}")
+            return False
+
+    for action, key in key_assign_map.items():
+        # if type(key) is dict:
+        if isinstance(key, dict):
+            sign = key["input_sign"]
+            keycode = key["code"]
+        else:
+            sign = 1
+            keycode = key
+        keybind(action, keycode, sign, bind_target)
+
+
 def _wrap_analog_input(
     key_code: int,
     input_sign: int = 1,
@@ -236,134 +353,12 @@ def _generate_handler(key_code: int, input_sign: int = 1) -> InputHandler:
         )
 
 
-def keybind(
-    action_name: str,
-    key_code: int,
-    input_sign: int = 1,
-    bind_target: TargetDevice = "pad",
-) -> bool:
-    """行動名に対してキーコード設定済入力判定クロージャおよびセーブロード用辞書を設定"""
-    match bind_target:
-        case "pad":
-            # rust>pyxel-platform>key.rsより
-            if key_code < px.GAMEPAD1_AXIS_LEFTX:
-                print(f"Warning: {action_name} to {key_code} is not a valid Pad code.")
-                return False
-            target_actmap = _action_keymap_pad
-            target_assign = _key_assign_map_pad
-        case "kbd":
-            if key_code >= px.MOUSE_POS_X:
-                print(
-                    f"Warning: {action_name} to {key_code} is not a valid keyboard code."
-                )
-                return False
-            target_actmap = _action_keymap_kbd
-            target_assign = _key_assign_map_kbd
-        case _:
-            return False
-
-    target_actmap[action_name] = _generate_handler(key_code, input_sign)
-    target_assign[action_name] = {"code": key_code, "input_sign": input_sign}
-
-    return True
-
-
-def _bind_all_actions(bind_target: TargetDevice, key_assign_map: dict | None = None):
-    """定義済データの一括反映"""
-    if key_assign_map is None:
-        if bind_target == "pad":
-            key_assign_map = DEFAULT_BINDS_PAD.copy()
-        elif bind_target == "kbd":
-            key_assign_map = DEFAULT_BINDS_KBD.copy()
-        else:
-            print(f"Warning: No default bindmap for bind_target:{bind_target}")
-            return False
-
-    for action, key in key_assign_map.items():
-        # if type(key) is dict:
-        if isinstance(key, dict):
-            sign = key["input_sign"]
-            keycode = key["code"]
-        else:
-            sign = 1
-            keycode = key
-        keybind(action, keycode, sign, bind_target)
-
-
-def init():
-    """初期化時に一括でバインドする"""
-    _bind_all_actions("pad")
-    _bind_all_actions("kbd")
-
-
-def listener(listen_target: TargetDevice = "pad") -> tuple[int, int] | None:
-    if listen_target == "pad":
-        # キーパッドの判定(アナログ入力)
-        for keycode in range(px.GAMEPAD1_AXIS_LEFTX, px.GAMEPAD1_AXIS_RIGHTY + 1):
-            input_val = px.btnv(keycode)
-            if (
-                abs(input_val) > ANALOG_THRESHOLD_XY
-            ):  # 1以上、とかだと遊びの範囲で超反応するケースあり
-                input_sign = int(px.sgn(input_val))
-                return keycode, input_sign
-        for keycode in range(px.GAMEPAD1_AXIS_TRIGGERLEFT, px.GAMEPAD1_AXIS_RIGHTY + 1):
-            input_val = px.btnv(keycode)
-            if abs(input_val) > ANALOG_THRESHOLD_TRIGGER:
-                return keycode, 1
-
-        # キーパッドの判定(デジタル入力)
-        for keycode in range(px.GAMEPAD1_BUTTON_A, px.GAMEPAD1_BUTTON_DPAD_RIGHT + 1):
-            if px.btnp(keycode):
-                return keycode, 1
-
-    elif listen_target == "kbd":
-        for keycode in ASSIGNABLE_KEYS:
-            if px.btnp(keycode):
-                return keycode, 1
-
-    return None
-
-
-def is_pressed(action_name: str, mode: InputMode = "once") -> bool:
-    """アクションに該当する入力の有無を判定する"""
-    # パッド
-    func_pad = _action_keymap_pad.get(action_name)
-    is_pad = func_pad(mode) if func_pad else False
-    # キーボード
-    func_kbd = _action_keymap_kbd.get(action_name)
-    is_kbd = func_kbd(mode) if func_kbd else False
-
-    return is_pad or is_kbd
-
-
-def get_keymap(target: TargetDevice):
-    """本モジュール利用側へキーマップ情報を提供"""
-    match target:
-        case "pad":
-            keymap = _key_assign_map_pad
-        case "kbd":
-            keymap = _key_assign_map_kbd
-
-    return keymap
-
-
-# ----------------------------------
-# のちのち共通関数等に切り出す部分の為敢えてここに記述
-# ----------------------------------
-# import json
-# from pathlib import Path
-# # 設定ファイルの保存先（Python標準のpathlibを使うと安全です）
 CONFIG_PATH = "keyconfig.json"
 
 
 def save_config():
     """jsonファイルとして設定を保存"""
     key_config_data = {"pad": _key_assign_map_pad, "kbd": _key_assign_map_kbd}
-
-    #     # 実際の組み込み時は共通関数のjson書き込みを呼び出す
-    #     with open(CONFIG_PATH, "w", encoding="utf-8") as f:
-    #         # indent=4 を入れると、人間がテキストエディタで読みやすい形式になります
-    #         json.dump(key_config_data, f, indent=4)
     path = check_file(CONFIG_PATH, "w")
     if path:
         write_json(path, key_config_data)
@@ -371,18 +366,12 @@ def save_config():
 
 def load_config():
     """jsonファイルからキーコードのマッピングを呼び出し、判定関数を再生成"""
-    # if not CONFIG_PATH.exists():
-    #         init()  # ファイルがなければデフォルトで初期化
-    #         return
     path = check_file(CONFIG_PATH, "r")
     if not path:
         init()
         return
 
     try:
-        # 実際の組み込み時は共通関数のjson読み込みを呼び出す
-        # with open(CONFIG_PATH, "r", encoding="utf-8") as f:
-        #     loaded_data = json.load(f)
         loaded_data = read_json(path)
 
         # デフォルト値をベースに、JSONにある設定だけを上書き（安全なマージ）
@@ -401,8 +390,6 @@ def load_config():
                 action, DEFAULT_BINDS_KBD[action]
             )
         _bind_all_actions("kbd", key_assign_map)
-
-    # except json.JSONDecodeError:
     except Exception:
         # ファイルが壊れていた場合はデフォルト設定のまま進行
         print("設定ファイルが破損しているため、デフォルト値を使用します。")

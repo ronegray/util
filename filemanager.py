@@ -1,3 +1,11 @@
+"""filemanager.py
+ファイル入出力関連
+
+- 形式に応じたファイルの入出力、および対象パスの確認
+-- テキスト形式
+-- json形式
+-- バイナリ形式
+"""
 from pathlib import Path
 import json
 
